@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+#set -o xtrace
+BOLD='\033[01m'
+RED='\033[31m'
+RESETC='\033[0m'
+FIRMURL="https://semiconductor.samsung.com/consumer-storage/support/tools/#firmware"
+FWISOMNT=/mnt/samsungssdfw
+FWISOTMP=/tmp/samsungssdfw
+
+# some code was taken from
+# https://old.reddit.com/r/zfs/comments/fuqgoi/script_to_update_samsung_ssd_firmware/ and https://blog.quindorian.org/2021/05/firmware-update-samsung-ssd-in-linux.html/
+_check_connectivity()
+{
+    echo "Checking connectivity..."
+    ping -c 1 -q -W 3 example.com > /dev/null 2>&1 || ( printf "${BOLD}${RED}No internet connectivity. Check your network settings and status.${RESETC}\n" && return 1 )
+}
+
+
+
+if [[ "$1" = "-d" || "$1" = "--download" ]]; then
+    _check_connectivity || exit 1
+    echo -e "Select a number to download the corresponding iso:\n\n"
+    sleep 3
+    ISOLIST=`curl -sJL $FIRMURL |  grep "iso" | grep -ioE "href=\"(.*)\"" | cut -d\" -f2`
+    ISOLISTLINES=$(echo "$ISOLIST" | wc -l)
+    [[ $ISOLISTLINES =~ ^[0-9]+$ ]] || { echo "${BOLD}${RED}Error while generating ISO list, aborting script.${RESETC}"; exit 1; }
+    echo "$ISOLIST" | nl |less 
+
+    while :; do
+        read -p "Enter a number between 1 and $ISOLISTLINES , or 'l' to list ISOs again: " FWCHOICE
+        if [[ "$FWCHOICE" = 'l' ]]; then
+            echo "$ISOLIST" | nl |less 
+            FWCHOICE=retry
+        fi
+        [[ $FWCHOICE =~ ^[0-9]+$ ]] || { echo "Enter a valid number"; continue; }
+        if ((FWCHOICE > 0 && FWCHOICE <= $ISOLISTLINES)); then
+            CHOSENURL=$(echo "$ISOLIST" | sed -n "${FWCHOICE}p")
+            echo -e "You have chosen $FWCHOICE. \nDownloading ${BOLD}$CHOSENURL${RESETC} to the current directory..."
+            curl -OJL --progress-bar $CHOSENURL
+            exit 0
+        fi
+    done
+    
+    exit 0
+fi
+
+if [[ "$1" = "-l" || "$1" = "--list" ]]; then
+    _check_connectivity || exit 1
+    echo -e "Listing the firmware files URL available on samsung official website:\n"
+    for iso in `curl -sJL $FIRMURL |  grep "iso" | grep -ioE "href=\"(.*)\"" | cut -d\" -f2`; do
+        sleep 3 # do not put too much strain on webservers
+        LMDATE="$(curl --head -sL $iso | grep -i 'last-modified')"
+        echo -e "$iso | $LMDATE\n"
+    done
+    exit 0
+fi
+
+if [ -z "$1" ]; then
+    echo -e "\n${BOLD}${RED}Error${RESETC}: You need to provide the path to a Samsung SDD firmware iso file.\nYou can download one of them from the Samsung website at ${BOLD}$FIRMURL${RESETC} or interactively by lauching this script with the ${BOLD}-d${RESETC} or ${BOLD}--download${RESETC} flag."
+    echo -e "You can also get a list of available ISOs and their last modified date by launching this script with the ${BOLD}-l${RESETC} or ${BOLD}--list${RESETC} argument\n"
+    exit 1
+fi
+
+if [[ $EUID > 0 ]]; then
+    echo -e "${BOLD}${RED}Error:${RESETC} You must run this script as root."
+    exit 1
+fi
+
+umount $FWISOMNT
+echo "Charging loop module..." && modprobe loop || (echo "${BOLD}${RED}Error:${RESETC} Can't load loop module to mount ISOs. You may have upgraded your kernel without rebooting." && exit 1)
+rm -rf $FWISOMNT
+mkdir -p $FWISOMNT
+mount -o loop "$1" "$FWISOMNT" || (echo -e "${BOLD}${RED}Can't mount iso to $FWISOMNT. Aborting script.${RESETC}" && exit 1)
+if [ -e "$FWISOMNT/initrd" ]; then
+    mkdir -p $FWISOTMP
+    cd $FWISOTMP
+    gzip -dc $FWISOMNT/initrd |  cpio -idv --no-absolute-filenames
+    cd root/fumagician
+    chmod +x fumagician
+    ./fumagician
+    rm -rf $FWISOTMP
+else
+    echo No initrd found. Aborting.
+    rm -rf "$FWISOTMP"
+fi
+umount $FWISOMNT
