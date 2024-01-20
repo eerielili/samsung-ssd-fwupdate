@@ -61,43 +61,51 @@ if [[ "$1" = "-d" || "$1" = "--download" ]]; then
     exit 0
 fi
 
-if [[ "$1" = "-l" || "$1" = "--list" ]]; then
+if [[ "$1" = "-l" || "$1" = "--list" || "$1" = "--list-dates" || "$1" = "-ld" ]]; then
     _check_connectivity || exit 1
-    echo -e "Listing the firmware files URL available on samsung official website:\n"
-    for iso in `curl -sJL $FIRMURL |  grep "iso" | grep -ioE "href=\"(.*)\"" | cut -d\" -f2`; do
-        sleep 3 # do not put too much strain on webservers
-        LMDATE="$(curl --head -sL $iso | grep -i 'last-modified')"
-        echo -e "$iso | $LMDATE\n"
-    done
+    FWLIST=`curl -sJL $FIRMURL |  grep "iso" | grep -ioE "href=\"(.*)\"" | cut -d\" -f2`
+    echo -e "Listing the Samsung SS firmware files URLs 'last modified' date. Sleeping $SLEEPTIME seconds between requests:\n"
+    if [[ "$1" = "--list-dates" || "$1" = "-ld" ]]; then
+        for iso in `echo "$FWLIST"`; do
+            sleep $SLEEPTIME
+            LMDATE="$(curl --head -sL $iso | grep -i 'last-modified')"
+            echo -e "$iso was $LMDATE"
+        done
+    else
+        echo "$FWLIST" | nl
+    fi
     exit 0
 fi
 
-if [ -z "$1" ]; then
-    echo -e "\n${BOLD}${RED}Error${RESETC}: You need to provide the path to a Samsung SDD firmware iso file.\nYou can download one of them from the Samsung website at ${BOLD}$FIRMURL${RESETC} or interactively by lauching this script with the ${BOLD}-d${RESETC} or ${BOLD}--download${RESETC} flag."
-    echo -e "You can also get a list of available ISOs and their last modified date by launching this script with the ${BOLD}-l${RESETC} or ${BOLD}--list${RESETC} argument\n"
-    exit 1
-fi
+if [[ "$1" = "-i" || "$1" = "--install" ]]; then
+    shift
+    if ! test -s "$1" ; then
+        echo "File is empty. Aborting script."
+        exit 1 
+    fi
 
-if [[ $EUID > 0 ]]; then
-    echo -e "${BOLD}${RED}Error:${RESETC} You must run this script as root."
-    exit 1
-fi
+    echo Samsung SSD ISO $1 was selected for install.
+    if [[ $EUID > 0 ]]; then
+        echo -e "${BOLD}${RED}Error:${RESETC} You must run this script as root."
+        exit 1
+    fi
 
-umount $FWISOMNT
-echo "Charging loop module..." && modprobe loop || (echo "${BOLD}${RED}Error:${RESETC} Can't load loop module to mount ISOs. You may have upgraded your kernel without rebooting." && exit 1)
-rm -rf $FWISOMNT
-mkdir -p $FWISOMNT
-mount -o loop "$1" "$FWISOMNT" || (echo -e "${BOLD}${RED}Can't mount iso to $FWISOMNT. Aborting script.${RESETC}" && exit 1)
-if [ -e "$FWISOMNT/initrd" ]; then
-    mkdir -p $FWISOTMP
-    cd $FWISOTMP
-    gzip -dc $FWISOMNT/initrd |  cpio -idv --no-absolute-filenames
-    cd root/fumagician
-    chmod +x fumagician
-    ./fumagician
-    rm -rf $FWISOTMP
-else
-    echo No initrd found. Aborting.
-    rm -rf "$FWISOTMP"
+    umount $FWISOMNT
+    echo "Charging loop module..." && modprobe loop || (echo "${BOLD}${RED}Error:${RESETC} Can't load loop module to mount ISOs. The cause is that you may have upgraded your kernel without rebooting." && exit 1)
+    rm -Irf "$FWISOMNT"
+    mkdir -p "$FWISOMNT"
+    mount -o loop "$1" "$FWISOMNT" || (echo -e "${BOLD}${RED}Can't mount iso to $FWISOMNT. Aborting script.${RESETC}" && exit 1)
+    if [ -e "$FWISOMNT/initrd" ]; then
+        cd "$FWISOTMP"
+        gzip -dc "$FWISOMNT/initrd" |  cpio -idv --no-absolute-filenames
+        cd root/fumagician
+        chmod +x fumagician
+        ./fumagician
+        rm -Irf "$FWISOTMP"
+    else
+        echo No initrd found. Aborting.
+        rm -Irf "$FWISOTMP"
+    fi
+    umount $FWISOMNT
+    rmmod loop
 fi
-umount $FWISOMNT
