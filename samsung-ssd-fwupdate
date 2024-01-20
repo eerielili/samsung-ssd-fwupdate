@@ -1,26 +1,43 @@
 #!/usr/bin/env bash
-#set -o xtrace
 BOLD='\033[01m'
 RED='\033[31m'
 RESETC='\033[0m'
 FIRMURL="https://semiconductor.samsung.com/consumer-storage/support/tools/#firmware"
 FWISOMNT=/mnt/samsungssdfw
 FWISOTMP=/tmp/samsungssdfw
+SLEEPTIME=3
 
 # some code was taken from
-# https://old.reddit.com/r/zfs/comments/fuqgoi/script_to_update_samsung_ssd_firmware/ and https://blog.quindorian.org/2021/05/firmware-update-samsung-ssd-in-linux.html/
+# https://old.reddit.com/r/zfs/comments/fuqgoi/script_to_update_samsung_ssd_firmware/ and
+# https://blog.quindorian.org/2021/05/firmware-update-samsung-ssd-in-linux.html/
+
+
+_check_req_commands()
+{
+    command -V unzip >/dev/null 2>&1 || (printf "${BOLD}${RED}unzip is not installed.${RESETC}\n" && return 1)
+    command -V curl >/dev/null 2>&1 || (printf "${BOLD}${RED}curl is not installed.${RESETC}\n" && return 1) 
+}
+
 _check_connectivity()
 {
     echo "Checking connectivity..."
-    ping -c 1 -q -W 3 example.com > /dev/null 2>&1 || ( printf "${BOLD}${RED}No internet connectivity. Check your network settings and status.${RESETC}\n" && return 1 )
+    ping -c 1 -q -W 3 1.1.1.1 > /dev/null 2>&1 || ( printf "${BOLD}${RED}No internet connectivity. Check your network settings and status.${RESETC}\n" && return 1 )
 }
 
+_check_req_commands || exit 1
 
+if [ -z "$1" ]; then
+    echo -e "${BOLD}${RED}Usage${RESETC}:"
+    echo -e " ${BOLD}-l${RESETC} or ${BOLD}--list${RESETC}: list SSD firmware iso files from the Samsung website (URL:$FIRMURL)"
+    echo -e " ${BOLD}-ld${RESETC} or ${BOLD}--list-dates${RESETC}: same as ${BOLD}-l${RESETC} but also displays 'last modified' date of ISO files"
+    echo -e " ${BOLD}-d${RESETC} or ${BOLD}--download${RESETC}: choose and download one of the iso files"
+    echo -e " ${BOLD}-i${RESETC} or ${BOLD}--install${RESETC}: take a Samsung SSD firmware ISO file as an argument an try to install it\n"
+    exit 1
+fi
 
 if [[ "$1" = "-d" || "$1" = "--download" ]]; then
     _check_connectivity || exit 1
     echo -e "Select a number to download the corresponding iso:\n\n"
-    sleep 3
     ISOLIST=`curl -sJL $FIRMURL |  grep "iso" | grep -ioE "href=\"(.*)\"" | cut -d\" -f2`
     ISOLISTLINES=$(echo "$ISOLIST" | wc -l)
     [[ $ISOLISTLINES =~ ^[0-9]+$ ]] || { echo "${BOLD}${RED}Error while generating ISO list, aborting script.${RESETC}"; exit 1; }
