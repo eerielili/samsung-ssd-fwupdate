@@ -1,4 +1,4 @@
-# Samsung SSD firmware updater for Linux
+# Samsung SSD firmware downloader and updater for Linux
 
 ## Purpose
 There were already some utilities in the AUR for updating Samsung SSD firmware on linux but it was a bit outdated so here we are.
