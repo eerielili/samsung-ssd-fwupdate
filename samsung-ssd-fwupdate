@@ -41,12 +41,12 @@ if [[ "$1" = "-d" || "$1" = "--download" ]]; then
     ISOLIST=`curl -sJL $FIRMURL |  grep "iso" | grep -ioE "href=\"(.*)\"" | cut -d\" -f2`
     ISOLISTLINES=$(echo "$ISOLIST" | wc -l)
     [[ $ISOLISTLINES =~ ^[0-9]+$ ]] || { echo "${BOLD}${RED}Error while generating ISO list, aborting script.${RESETC}"; exit 1; }
-    echo "$ISOLIST" | nl |less 
+    echo "$ISOLIST" | nl | less
 
     while :; do
         read -p "Enter a number between 1 and $ISOLISTLINES , or 'l' to list ISOs again: " FWCHOICE
         if [[ "$FWCHOICE" = 'l' ]]; then
-            echo "$ISOLIST" | nl |less 
+            echo "$ISOLIST" | nl | less
             FWCHOICE=retry
         fi
         [[ $FWCHOICE =~ ^[0-9]+$ ]] || { echo "Enter a valid number"; continue; }
@@ -64,7 +64,7 @@ fi
 if [[ "$1" = "-l" || "$1" = "--list" || "$1" = "--list-dates" || "$1" = "-ld" ]]; then
     _check_connectivity || exit 1
     FWLIST=`curl -sJL $FIRMURL |  grep "iso" | grep -ioE "href=\"(.*)\"" | cut -d\" -f2`
-    echo -e "Listing the Samsung SS firmware files URLs 'last modified' date. Sleeping $SLEEPTIME seconds between requests:\n"
+    echo -e "Here's the Samsung SSD firmware files direct URLs:\n"
     if [[ "$1" = "--list-dates" || "$1" = "-ld" ]]; then
         for iso in `echo "$FWLIST"`; do
             sleep $SLEEPTIME
