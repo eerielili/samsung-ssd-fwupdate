@@ -4,7 +4,7 @@ RED='\033[31m'
 RESETC='\033[0m'
 FIRMURL="https://semiconductor.samsung.com/consumer-storage/support/tools/#firmware"
 FWISOMNT=/mnt/samsungssdfw
-FWISOTMP=/tmp/samsungssdfw
+FWISOTMP=/mnt/samsungssdiso_tmp
 SLEEPTIME=3
 
 # some code was taken from
@@ -91,20 +91,29 @@ if [[ "$1" = "-i" || "$1" = "--install" ]]; then
     fi
 
     umount $FWISOMNT
+    umount -v "$FWISOTMP/dev" "$FWISOTMP/sys" "$FWISOTMP/proc" "$FWISOTMP/run"
+
     echo "Charging loop module..." && modprobe loop || (echo "${BOLD}${RED}Error:${RESETC} Can't load loop module to mount ISOs. The cause is that you may have upgraded your kernel without rebooting." && exit 1)
-    rm -Irf "$FWISOMNT"
-    mkdir -p "$FWISOMNT"
+    echo "Cleaning up $FWISOTMP ..."
+    rm -rf "$FWISOTMP"
+    echo "Cleaning up $FWISOMNT ..."
+    rm -rf "$FWISOMNT"
+    mkdir -vp "$FWISOMNT" "$FWISOTMP"
     mount -o loop "$1" "$FWISOMNT" || (echo -e "${BOLD}${RED}Can't mount iso to $FWISOMNT. Aborting script.${RESETC}" && exit 1)
     if [ -e "$FWISOMNT/initrd" ]; then
         cd "$FWISOTMP"
         gzip -dc "$FWISOMNT/initrd" |  cpio -idv --no-absolute-filenames
-        cd root/fumagician
-        chmod +x fumagician
-        ./fumagician
-        rm -Irf "$FWISOTMP"
+        # https://blog.quindorian.org/2021/05/firmware-update-samsung-ssd-in-linux.html/#comment-62287
+        mount -v --bind /dev "$FWISOTMP/dev"
+        mount -v --bind /sys "$FWISOTMP/sys"
+        mount -v --bind /proc "$FWISOTMP/proc"
+        mount -v --bind /run "$FWISOTMP/run"
+        chmod -v +x "$FWISOTMP/root/fumagician/fumagician"
+        chroot "$FWISOTMP" "/root/fumagician/fumagician"
+        umount -v "$FWISOTMP/dev" "$FWISOTMP/sys" "$FWISOTMP/proc" "$FWISOTMP/run"
     else
         echo No initrd found. Aborting.
-        rm -Irf "$FWISOTMP"
+        rm -rf "$FWISOTMP"
     fi
     umount $FWISOMNT
     rmmod loop
