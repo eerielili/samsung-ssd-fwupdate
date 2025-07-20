@@ -80,7 +80,7 @@ fi
 if [[ "$1" = "-i" || "$1" = "--install" ]]; then
     shift
     if ! test -s "$1" ; then
-        echo "File is empty. Aborting script."
+        echo "File $1 is empty. Aborting script."
         exit 1 
     fi
 
@@ -90,10 +90,16 @@ if [[ "$1" = "-i" || "$1" = "--install" ]]; then
         exit 1
     fi
 
+    echo -e """\n${BOLD}${RED}DISCLAIMER: AS A PRECAUTION, PLEASE MAKE A BACKUP OF YOUR CRITICAL DATA BEFORE 
+PROCEEDING. I AM NOT RESPONSIBLE FOR ANY DATA LOSS.${RESETC}
+
+(press any key to continue)"""
+    read -s -n 1
+    
     umount $FWISOMNT
     umount -v "$FWISOTMP/dev" "$FWISOTMP/sys" "$FWISOTMP/proc" "$FWISOTMP/run"
 
-    echo "Charging loop module..." && modprobe loop || (echo "${BOLD}${RED}Error:${RESETC} Can't load loop module to mount ISOs. The cause is that you may have upgraded your kernel without rebooting." && exit 1)
+    echo "Charging loop module..." && modprobe loop || (echo -e "${BOLD}${RED}Error:${RESETC} Can't load loop module to mount ISOs. The cause is that you may have upgraded your kernel without rebooting." && exit 1)
     echo "Cleaning up $FWISOTMP ..."
     rm -rf "$FWISOTMP"
     echo "Cleaning up $FWISOMNT ..."
@@ -111,8 +117,9 @@ if [[ "$1" = "-i" || "$1" = "--install" ]]; then
         chmod -v +x "$FWISOTMP/root/fumagician/fumagician"
         chroot "$FWISOTMP" "/root/fumagician/fumagician"
         umount -v "$FWISOTMP/dev" "$FWISOTMP/sys" "$FWISOTMP/proc" "$FWISOTMP/run"
+        echo -e "\n${BOLD}If the firmware update was successful it is recommended that you reboot.${RESETC}\n"
     else
-        echo No initrd found. Aborting.
+        echo -e "${BOLD}${RED}No initrd found. Aborting.${RESETC}"
         rm -rf "$FWISOTMP"
     fi
     umount $FWISOMNT
