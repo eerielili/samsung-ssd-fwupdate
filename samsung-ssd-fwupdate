@@ -93,8 +93,8 @@ if [[ "$1" = "-i" || "$1" = "--install" ]]; then
     echo -e """\n${BOLD}${RED}DISCLAIMER: AS A PRECAUTION, PLEASE MAKE A BACKUP OF YOUR CRITICAL DATA BEFORE
 PROCEEDING. I AM NOT RESPONSIBLE FOR ANY DATA LOSS.${RESETC}
 
-(press any key to continue)\n"""
-    read -s -n 1
+(press any key to continue or wait 10 seconds)\n"""
+    read -t 10 -s -n 1
 
     umount $FWISOMNT
     umount -v "$FWISOTMP/dev" "$FWISOTMP/sys" "$FWISOTMP/proc" "$FWISOTMP/run"
