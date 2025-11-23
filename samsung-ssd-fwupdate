@@ -27,11 +27,15 @@ _check_connectivity()
 _check_req_commands || exit 1
 
 if [ -z "$1" ]; then
-    echo -e "${BOLD}${RED}Usage${RESETC}:"
-    echo -e " ${BOLD}-l${RESETC} or ${BOLD}--list${RESETC}: list SSD firmware iso files from the Samsung website (URL:$FIRMURL)"
-    echo -e " ${BOLD}-ld${RESETC} or ${BOLD}--list-dates${RESETC}: same as ${BOLD}-l${RESETC} but also displays 'last modified' date of ISO files"
-    echo -e " ${BOLD}-d${RESETC} or ${BOLD}--download${RESETC}: choose and download one of the iso files"
-    echo -e " ${BOLD}-i${RESETC} or ${BOLD}--install${RESETC}: take a Samsung SSD firmware ISO file as an argument an try to install it\n"
+    echo -e "\n${BOLD}${RED}Usage${RESETC}:"
+    echo -e "   ${BOLD}-l${RESETC} or ${BOLD}--list${RESETC}: list SSD firmware iso files from the Samsung website (URL: $FIRMURL)"
+    echo -e "   ${BOLD}-ld${RESETC} or ${BOLD}--list-dates${RESETC}: same as ${BOLD}-l${RESETC} but also displays 'last modified' date of ISO files"
+    echo -e "   ${BOLD}-d${RESETC} or ${BOLD}--download${RESETC}: choose and download one of the iso files"
+    echo -e """   ${BOLD}-i${RESETC} or ${BOLD}--install${RESETC}: take a Samsung SSD firmware ISO file as an argument an try to install it. Optionally, you can also provide a flashing method as a second argument after the ISO file. Available flashing methods currently are:
+    - chroot
+    - direct
+    The chroot method is recommended because of higher success rates.
+"""
     exit 1
 fi
 
@@ -99,7 +103,11 @@ PROCEEDING. I AM NOT RESPONSIBLE FOR ANY DATA LOSS.${RESETC}
     umount $FWISOMNT
     umount -v "$FWISOTMP/dev" "$FWISOTMP/sys" "$FWISOTMP/proc" "$FWISOTMP/run"
 
-    while [[ -z $FLASHING_METHOD || $FLASHING_METHOD -le 0 ||  $FLASHING_METHOD -gt 2 ]] ; do
+    while [[ $FLASHING_METHOD -le 0 ||  $FLASHING_METHOD -gt 2 ]] ; do
+        if [ -n "$2" ]; then
+            FLASHING_METHOD=$2
+            break
+        fi
         echo -e "\nChoose a flashing method :"
         echo -e "\t1. Chrooting (recommended, higher chances of working)." # https://blog.quindorian.org/2021/05/firmware-update-samsung-ssd-in-linux.html/#comment-62287
         echo -e "\t2. Executing fumagician without chrooting."
@@ -120,7 +128,7 @@ PROCEEDING. I AM NOT RESPONSIBLE FOR ANY DATA LOSS.${RESETC}
         chmod -v +x "$FWISOTMP/root/fumagician/fumagician"
 
         case $FLASHING_METHOD in
-            1)  echo -e "Using chrooting method...";
+            1|chroot)  echo -e "Using chrooting method...";
                 sleep 3;
                 mount -v --bind /dev "$FWISOTMP/dev";
                 mount -v --bind /sys "$FWISOTMP/sys";
@@ -129,7 +137,7 @@ PROCEEDING. I AM NOT RESPONSIBLE FOR ANY DATA LOSS.${RESETC}
                 chroot "$FWISOTMP" "/root/fumagician/fumagician";
                 umount -v "$FWISOTMP/dev" "$FWISOTMP/sys" "$FWISOTMP/proc" "$FWISOTMP/run";
                 ;;
-            2)  echo -e "Using direct fumagician execution method...";
+            2|direct)  echo -e "Using direct fumagician execution method...";
                 sleep 3;
                 cd "$FWISOTMP/root/fumagician";
                 ./fumagician;
